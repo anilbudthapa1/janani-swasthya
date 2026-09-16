@@ -1,0 +1,54 @@
+name: Unpack Janani Swasthya source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.bootstrap/**'
+      - '.github/workflows/unpack-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  unpack-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect bootstrap archive
+        id: bootstrap
+        shell: bash
+        run: |
+          if [ -f .bootstrap/source.b64.part00 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Reconstruct and validate source
+        if: steps.bootstrap.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/source.b64.part* | base64 --decode > /tmp/janani-source.zip
+          unzip -tq /tmp/janani-source.zip
+          unzip -o /tmp/janani-source.zip -d .
+          rm -rf .bootstrap
+          rm -f readme.md
+
+      - name: Commit expanded project tree
+        if: steps.bootstrap.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git commit -m "Add complete Janani Swasthya source"
+          git push
