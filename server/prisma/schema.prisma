@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  HEALTHCARE_WORKER
+  SUPERVISOR
+  ADMIN
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Sex {
+  FEMALE
+  MALE
+  OTHER
+}
+
+enum VaccineStatus {
+  DUE
+  COMPLETED
+  MISSED
+}
+
+enum AssistanceStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id              String        @id @default(uuid())
+  name            String
+  email           String        @unique
+  passwordHash    String
+  role            Role          @default(HEALTHCARE_WORKER)
+  active          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  assignedMothers Mother[]      @relation("AssignedWorker")
+  ancVisits       AncVisit[]
+  vaccinations    Vaccination[]
+  assistance      Assistance[]
+}
+
+model Mother {
+  id                String       @id @default(uuid())
+  maternalId        String       @unique
+  fullName          String
+  dateOfBirth       DateTime?
+  phone             String
+  email             String?
+  address           String
+  ward              String?
+  bloodGroup        String?
+  pregnancyStatus   String       @default("Pregnant")
+  lastMenstrualDate DateTime?
+  expectedDueDate   DateTime?
+  riskLevel         RiskLevel    @default(LOW)
+  riskNotes         String?
+  assignedWorkerId  String?
+  assignedWorker    User?        @relation("AssignedWorker", fields: [assignedWorkerId], references: [id])
+  children          Child[]
+  ancVisits         AncVisit[]
+  assistance        Assistance[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model Child {
+  id            String         @id @default(uuid())
+  childId       String         @unique
+  motherId      String
+  mother        Mother         @relation(fields: [motherId], references: [id], onDelete: Cascade)
+  fullName      String
+  dateOfBirth   DateTime
+  sex           Sex
+  birthWeightKg Float?
+  bloodGroup    String?
+  notes         String?
+  growthRecords GrowthRecord[]
+  vaccinations  Vaccination[]
+  assistance    Assistance[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model AncVisit {
+  id                String   @id @default(uuid())
+  motherId          String
+  mother            Mother   @relation(fields: [motherId], references: [id], onDelete: Cascade)
+  visitDate         DateTime
+  gestationalWeeks  Int?
+  systolic          Int?
+  diastolic         Int?
+  weightKg          Float?
+  hemoglobin        Float?
+  notes             String?
+  nextVisitDate     DateTime?
+  riskFlag          Boolean  @default(false)
+  createdById       String
+  createdBy         User     @relation(fields: [createdById], references: [id])
+  createdAt         DateTime @default(now())
+}
+
+model GrowthRecord {
+  id          String   @id @default(uuid())
+  childId     String
+  child       Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  recordedAt  DateTime
+  weightKg    Float
+  heightCm    Float?
+  headCm      Float?
+  nutrition   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Vaccination {
+  id               String        @id @default(uuid())
+  childId          String
+  child            Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+  vaccineName      String
+  dose             String
+  scheduledDate    DateTime
+  administeredDate DateTime?
+  status           VaccineStatus @default(DUE)
+  batchNumber      String?
+  notes            String?
+  createdById      String
+  createdBy        User          @relation(fields: [createdById], references: [id])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model Assistance {
+  id           String           @id @default(uuid())
+  motherId     String?
+  mother       Mother?          @relation(fields: [motherId], references: [id], onDelete: SetNull)
+  childId      String?
+  child        Child?           @relation(fields: [childId], references: [id], onDelete: SetNull)
+  requestType  String
+  details      String
+  priority     RiskLevel        @default(LOW)
+  status       AssistanceStatus @default(OPEN)
+  followUpDate DateTime?
+  resolution   String?
+  createdById  String
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
